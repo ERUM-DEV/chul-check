@@ -1,0 +1,48 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+# 출석 취소 기능 ✅
+- 출석 체크가 된 셀을 다시 누르면 출석 해제가 된다
+
+# 출석체크, 해제 상태 Toast 표기  ✅
+- 출석체크될때 초록색 Toast를 가운데 상단에 1초 표시해줘
+- 출석 해제할때 빨강색 Toast를 가운데 상단 1초 표시해줘
+- 누가 어떤 셀이 출석되었는지 표시해줘
+
+# 출석 현황 테이블 @AttendanceCheck.tsx✅
+- 각 Column의 첫번째 Row는 members Table의 group_name들이 유니크하게 나열되어있어야한다.(DB에서 members Table을 조회하고 Group_name 값을 꼭 가져와야한다.)
+- 각 Column의 2번째 부터의 Row는 그 group_name을 가진 사람만이 이 Column에 이름(name)을 넣을 수 있다.
+- 만약 Group_name이 없는 멤버라면 "미정"이라는 group에 몰아있어야한다.
+- 셀A, 셀B, 셀C에 해당하는 것은 group_name이고
+홍길동, 이순신, 강감찬은 name에 해당돼
+
+
+# 다크모드, 라이트모드 변경 기능 ✅
+- 설정 메뉴를 만들어줘 
+- 설정 메뉴에 다크모드, 라이트모드 변경 기능을 추가해줘 
+- 다크모드, 라이트모드 변경 기능을 추가해줘 
+
+# 메뉴 바 하단 이동 [Layout.tsx](mdc:src/components/Layout.tsx) ✅
+- 상단에 있는 네비게이션 바를 하단으로 옮겨줘
+
+
+# 목업데이터 추가 [church.db](mdc:church.db) ✅
+- 총 10개의 그룹을 만들고 각 그룹당 평균 10명 편차 3명 정도 명단을 임의로 추가해줘
+
+# 출석 현황 테이블 UI 개선 [AttendanceCheck.tsx](mdc:src/pages/AttendanceCheck.tsx) ✅
+- 테이블 형태가 온전할 수 있도록 좌우 스크롤을 할 수 있어야해 
+- 출석 현황 테이블의 첫번째 Row는 스크롤을 하더라도 항상 보여져야해
+
+# 대시보드화면 버그 해결✅
+- 대시보드화면을 처음 진입 했을때에 데이터들이 온전하게 반영되었으면 좋겠어 처음엔 전체 성도가 0명, 출석 성도 0명이라고해 그러니까 DB에 바로 업데이트하고 바로 반영했으면 좋겠어. 
+- 만약에 SQLite DB Table을 더 만들어야한다면 만들어줘
+
+
+
+
+
+
+
