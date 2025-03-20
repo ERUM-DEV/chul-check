@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- router 라이브러리로 @tanstack/react-router을 써야만해 명심해

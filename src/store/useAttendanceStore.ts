@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { format } from 'date-fns'
 
 export interface AttendanceRecord {
   memberId: string;
@@ -12,10 +13,13 @@ interface AttendanceState {
   isLoading: boolean;
   error: string | null;
   attendanceHistory: AttendanceRecord[];
+  attendedMembers: Set<string>;
 
   // Actions
-  markAttendance: (memberId: string, date: string, type: AttendanceRecord['type']) => Promise<void>;
+  markAttendance: (memberId: string, date: string, type: string) => Promise<void>;
   setCurrentEvent: (eventName: string) => void;
+  fetchTodayAttendance: () => Promise<void>;
+  removeAttendance: (memberId: string, date: string) => Promise<void>;
 }
 
 export const useAttendanceStore = create<AttendanceState>((set, get) => ({
@@ -24,37 +28,52 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => ({
   isLoading: false,
   error: null,
   attendanceHistory: [],
+  attendedMembers: new Set<string>(),
 
-  markAttendance: async (memberId: string, date: string, type: AttendanceRecord['type'] = '전체') => {
-    set({ isLoading: true, error: null })
+  fetchTodayAttendance: async () => {
+    set({ isLoading: true, error: null });
     try {
-      const result = await window.electronAPI.markAttendance(memberId, date, type)
-      
-      // 출석 기록 업데이트
-      const history = [...get().attendanceHistory];
-      const existingIndex = history.findIndex(
-        record => record.memberId === memberId && record.date === date
-      );
-      
-      if (existingIndex >= 0) {
-        history[existingIndex] = { memberId, date, type };
-      } else {
-        history.push({ memberId, date, type });
-      }
-      
-      set({ attendanceHistory: history });
-      
-      if (result.wasLongAbsent) {
-        // TODO: 장결 해제 알림 표시
-      }
-      
-      set({ isLoading: false })
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const records = await window.electronAPI.getTodayAttendance(today);
+      set({ 
+        attendedMembers: new Set(records.map((record: any) => record.member_id)),
+        isLoading: false 
+      });
     } catch (error) {
-      set({ error: (error as Error).message })
+      console.error('Error fetching today attendance:', error);
+      set({ error: 'Failed to fetch attendance records', isLoading: false });
+    }
+  },
+
+  markAttendance: async (memberId: string, date: string, type: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await window.electronAPI.markAttendance(memberId, date, type);
+      set(state => ({
+        attendedMembers: new Set([...state.attendedMembers, memberId]),
+        isLoading: false
+      }));
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+      set({ error: 'Failed to mark attendance', isLoading: false });
     }
   },
 
   setCurrentEvent: (eventName: string) => {
     set({ currentEvent: eventName })
   },
+
+  removeAttendance: async (memberId: string, date: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await window.electronAPI.removeAttendance(memberId, date);
+      set(state => ({
+        attendedMembers: new Set([...state.attendedMembers].filter(id => id !== memberId)),
+        isLoading: false
+      }));
+    } catch (error) {
+      console.error('Error removing attendance:', error);
+      set({ error: 'Failed to remove attendance', isLoading: false });
+    }
+  }
 })) 

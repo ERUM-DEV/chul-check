@@ -1,37 +1,47 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useMemberStore } from '../store/useMemberStore';
 import { useAttendanceStore } from '../store/useAttendanceStore';
-import { Attendance } from '../types';
+import { AttendanceRecord } from '../store/useAttendanceStore';
 
 export function Dashboard() {
-  const { members } = useMemberStore();
-  const { attendances } = useAttendanceStore();
+  const { members, fetchMembers } = useMemberStore();
+  const { attendanceHistory = [], fetchTodayAttendance } = useAttendanceStore();
+
+  // 초기 데이터 로딩
+  useEffect(() => {
+    Promise.all([
+      fetchMembers(),
+      fetchTodayAttendance()
+    ]).catch(error => {
+      console.error('Failed to fetch dashboard data:', error);
+    });
+  }, [fetchMembers, fetchTodayAttendance]);
 
   // 구역별 통계
   const groupStats = useMemo(() => {
     const stats = new Map<string, { total: number; present: number; longAbsence: number }>();
 
     members.forEach(member => {
-      const group = stats.get(member.groupName) || { total: 0, present: 0, longAbsence: 0 };
+      const group = stats.get(member.group_name) || { total: 0, present: 0, longAbsence: 0 };
       group.total += 1;
-      if (member.longAbsence) {
+      if (member.long_absence === 1) {
         group.longAbsence += 1;
       }
-      stats.set(member.groupName, group);
+      stats.set(member.group_name, group);
     });
 
     // 출석 정보 반영
     const today = new Date().toISOString().split('T')[0];
-    (attendances as Attendance[])
-      .filter((a: Attendance) => a.date === today)
-      .forEach((attendance: Attendance) => {
+    attendanceHistory
+      .filter((a: AttendanceRecord) => a.date === today)
+      .forEach((attendance: AttendanceRecord) => {
         const member = members.find(m => m.id === attendance.memberId);
         if (!member) return;
 
-        const group = stats.get(member.groupName);
+        const group = stats.get(member.group_name);
         if (group) {
           group.present += 1;
-          stats.set(member.groupName, group);
+          stats.set(member.group_name, group);
         }
       });
 
@@ -40,7 +50,7 @@ export function Dashboard() {
       ...data,
       attendanceRate: data.total > 0 ? Math.round((data.present / data.total) * 100) : 0
     }));
-  }, [members, attendances]);
+  }, [members, attendanceHistory]);
 
   // 세대별 통계
   const generationStats = useMemo(() => {
@@ -49,7 +59,7 @@ export function Dashboard() {
     members.forEach(member => {
       const generation = stats.get(member.generation) || { total: 0, present: 0, longAbsence: 0 };
       generation.total += 1;
-      if (member.longAbsence) {
+      if (member.long_absence === 1) {
         generation.longAbsence += 1;
       }
       stats.set(member.generation, generation);
@@ -57,9 +67,9 @@ export function Dashboard() {
 
     // 출석 정보 반영
     const today = new Date().toISOString().split('T')[0];
-    (attendances as Attendance[])
-      .filter((a: Attendance) => a.date === today)
-      .forEach((attendance: Attendance) => {
+    attendanceHistory
+      .filter((a: AttendanceRecord) => a.date === today)
+      .forEach((attendance: AttendanceRecord) => {
         const member = members.find(m => m.id === attendance.memberId);
         if (!member) return;
 
@@ -75,7 +85,7 @@ export function Dashboard() {
       ...data,
       attendanceRate: data.total > 0 ? Math.round((data.present / data.total) * 100) : 0
     }));
-  }, [members, attendances]);
+  }, [members, attendanceHistory]);
 
   // 월별 출석률 통계
   const monthlyStats = useMemo(() => {
@@ -90,7 +100,7 @@ export function Dashboard() {
 
       // 해당 월의 출석자 수집
       uniqueAttendees.clear();
-      (attendances as Attendance[]).forEach((attendance: Attendance) => {
+      attendanceHistory.forEach((attendance: AttendanceRecord) => {
         const attendanceDate = new Date(attendance.date);
         if (
           attendanceDate.getMonth() === targetDate.getMonth() &&
@@ -109,7 +119,12 @@ export function Dashboard() {
     }
 
     return stats;
-  }, [members, attendances]);
+  }, [members, attendanceHistory]);
+
+  // 활성화된 멤버만 필터링
+  const activeMembers = useMemo(() => {
+    return members.filter(m => m.enable === 1);
+  }, [members]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -118,18 +133,18 @@ export function Dashboard() {
       {/* 전체 통계 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-3xl font-bold text-blue-600">{members.length}</div>
+          <div className="text-3xl font-bold text-blue-600">{activeMembers.length}</div>
           <div className="text-sm text-gray-500">전체 성도</div>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="text-3xl font-bold text-green-600">
-            {(attendances as Attendance[]).filter((a: Attendance) => a.date === new Date().toISOString().split('T')[0]).length}
+            {attendanceHistory.filter((a: AttendanceRecord) => a.date === new Date().toISOString().split('T')[0]).length}
           </div>
           <div className="text-sm text-gray-500">출석 성도</div>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="text-3xl font-bold text-red-600">
-            {members.filter(m => m.longAbsence).length}
+            {activeMembers.filter(m => m.long_absence === 1).length}
           </div>
           <div className="text-sm text-gray-500">장기 결석</div>
         </div>

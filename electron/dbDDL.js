@@ -1,67 +1,14 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const Database = require('better-sqlite3')
 
 // 데이터베이스 연결 설정
 const db = new Database('church.db', { verbose: console.log })
 
-// 테이블 생성
-db.exec(`
-  -- 성도 테이블
-  CREATE TABLE IF NOT EXISTS members (
-    id TEXT PRIMARY KEY, -- 이름_생년월일_성별_가입연월
-    group_name TEXT NOT NULL,
-    name TEXT NOT NULL,
-    birth_date TEXT,
-    gender TEXT NOT NULL,
-    joined_date TEXT NOT NULL,
-    generation TEXT NOT NULL,
-    roles TEXT NOT NULL, -- 직분(","로 다중선택)
-    recent_attendance_date TEXT,
-    attendance_count INTEGER DEFAULT 0,
-    enable INTEGER DEFAULT 1,
-    long_absence INTEGER DEFAULT 0, -- 0(정상), 1(장결)
-    long_absence_reason TEXT DEFAULT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 출석 기록 테이블
-  CREATE TABLE IF NOT EXISTS attendance (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    member_id TEXT NOT NULL,
-    attendance_date DATE NOT NULL,
-    attendance_type TEXT NOT NULL, -- '예배만', '전체', '셀모임만'
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (member_id) REFERENCES members(id),
-    UNIQUE(member_id, attendance_date)
-  );
-
-  -- 성도 정보 수정 이력 테이블
-  CREATE TABLE IF NOT EXISTS members_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    member_id TEXT NOT NULL,
-    changed_field TEXT NOT NULL,
-    old_value TEXT,
-    new_value TEXT,
-    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (member_id) REFERENCES members(id)
-  );
-
-  -- 행사 테이블
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    event_date DATE NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 관리자 설정 테이블
-  CREATE TABLE IF NOT EXISTS settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    pin TEXT NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`)
+// 스키마 파일 읽기 및 실행
+const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8')
+db.exec(schema)
 
 // 기본 PIN 설정 (초기값: 0000)
 db.exec(`
@@ -73,14 +20,14 @@ db.exec(`
   -- 테스트용 성도 데이터
   INSERT OR IGNORE INTO members (
     id, group_name, name, birth_date, gender, joined_date, 
-    generation, roles, recent_attendance_date, attendance_count
+    generation, roles, recent_attendance_date, attendance_count, enable
   ) VALUES 
     ('홍길동_990101_M_202301', '1셀', '홍길동', '1999-01-01', 'M', '202301', 
-     'POWER Generation', '성도,찬양팀', NULL, 0),
+     'POWER Generation', '성도,찬양팀', NULL, 0, 1),
     ('김철수_000101_M_202302', '2셀', '김철수', '2000-01-01', 'M', '202302',
-     'POWER Generation', '성도', NULL, 0),
+     'POWER Generation', '성도', NULL, 0, 1),
     ('이영희_980101_F_202303', '새가족셀', '이영희', '1998-01-01', 'F', '202303',
-     'POWER Generation', '성도,새가족', NULL, 0);
+     'POWER Generation', '성도,새가족', NULL, 0, 1);
 `)
 
 // IPC 핸들러 설정
@@ -92,7 +39,7 @@ ipcMain.handle('auth:checkPin', async (event, pin) => {
 })
 
 // 2. 성도 관리 관련
-ipcMain.handle('members:getAll', () => {
+ipcMain.handle('getAllMembers', () => {
   const stmt = db.prepare(`
     SELECT m.*, 
            GROUP_CONCAT(DISTINCT a.attendance_date) as attendance_dates,
@@ -106,26 +53,49 @@ ipcMain.handle('members:getAll', () => {
   return stmt.all()
 })
 
-ipcMain.handle('members:add', (event, member) => {
-  const stmt = db.prepare(`
-    INSERT INTO members (
-      id, group_name, name, birth_date, gender, joined_date, 
-      generation, roles
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  return stmt.run(
-    member.id,
-    member.group_name,
-    member.name,
-    member.birth_date,
-    member.gender,
-    member.joined_date,
-    member.generation,
-    member.roles.join(',')
-  )
+// 성도 추가
+ipcMain.handle('addMember', (event, member) => {
+  console.log('Adding new member:', member);
+  
+  // ID 생성: 이름_생년월일_성별_가입연월
+  const id = `${member.name}_${member.birthDate?.replace(/-/g, '') || '000000'}_${member.gender}_${member.joinedDate.replace(/-/g, '')}`
+  console.log('Generated ID:', id);
+  
+  try {
+    // 성도 추가
+    const stmt = db.prepare(`
+      INSERT INTO members (
+        id, group_name, name, birth_date, gender, joined_date,
+        generation, roles, recent_attendance_date, attendance_count,
+        enable, long_absence, long_absence_reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    
+    const result = stmt.run(
+      id,
+      member.groupName,
+      member.name,
+      member.birthDate || null,
+      member.gender,
+      member.joinedDate,
+      member.generation,
+      member.roles.join(','),
+      null,
+      0,
+      1,
+      member.longAbsence ? 1 : 0,
+      member.longAbsenceReason || null
+    )
+    
+    console.log('Member added successfully:', result);
+    return result;
+  } catch (error) {
+    console.error('Error adding member:', error);
+    throw error;
+  }
 })
 
-ipcMain.handle('members:update', (event, { id, field, value, oldValue }) => {
+ipcMain.handle('updateMember', (event, { id, field, value, oldValue }) => {
   // 성도 정보 업데이트
   const updateStmt = db.prepare(`UPDATE members SET ${field} = ? WHERE id = ?`)
   const result = updateStmt.run(value, id)
@@ -141,6 +111,23 @@ ipcMain.handle('members:update', (event, { id, field, value, oldValue }) => {
 })
 
 // 3. 출석 관리 관련
+ipcMain.handle('attendance:remove', (event, { memberId, date }) => {
+  const stmt = db.prepare(`
+    DELETE FROM attendance 
+    WHERE member_id = ? AND attendance_date = ?
+  `)
+  return stmt.run(memberId, date)
+})
+
+ipcMain.handle('attendance:getToday', (event, date) => {
+  const stmt = db.prepare(`
+    SELECT member_id, attendance_type 
+    FROM attendance 
+    WHERE attendance_date = ?
+  `)
+  return stmt.all(date)
+})
+
 ipcMain.handle('attendance:mark', (event, { memberId, date, type = '예배만' }) => {
   // 장결자 체크
   const memberStmt = db.prepare('SELECT long_absence FROM members WHERE id = ?')
@@ -184,7 +171,16 @@ function createWindow () {
     }
   })
 
-  win.loadFile('index.html')
+  // 개발 모드에서는 localhost:3001을 로드하고, 프로덕션 모드에서는 dist/index.html을 로드합니다
+  if (process.argv.includes('--dev')) {
+    // Vite 개발 서버가 시작될 때까지 잠시 대기
+    setTimeout(() => {
+      win.loadURL('http://localhost:3000')
+      win.webContents.openDevTools()
+    }, 1000)
+  } else {
+    win.loadFile(path.join(__dirname, '../dist/index.html'))
+  }
 }
 
 app.whenReady().then(() => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -23,7 +23,12 @@ export function MemberList() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const { members, updateMember } = useMemberStore();
+  const { members, updateMember, fetchMembers } = useMemberStore();
+
+  // 컴포넌트가 마운트될 때 성도 목록을 가져옵니다.
+  useEffect(() => {
+    fetchMembers();
+  }, []);
 
   const columns = useMemo(
     () => [
@@ -45,7 +50,10 @@ export function MemberList() {
       }),
       columnHelper.accessor('roles', {
         header: '직분',
-        cell: info => info.getValue().join(', '),
+        cell: info => {
+          const roles = info.getValue();
+          return Array.isArray(roles) ? roles.join(', ') : roles;
+        },
       }),
       columnHelper.accessor('attendanceCount', {
         header: '출석 횟수',
