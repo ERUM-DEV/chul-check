@@ -1,7 +1,7 @@
 {
   "name": "electron-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Church Attendance Management System",
   "main": "electron/dbDDL.js",
   "scripts": {
@@ -13,7 +13,11 @@
     "electron:build": "npm run build && electron-builder",
     "postinstall": "electron-rebuild",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "release": "standard-version",
+    "release:minor": "standard-version --release-as minor",
+    "release:patch": "standard-version --release-as patch",
+    "release:major": "standard-version --release-as major"
   },
   "author": "",
   "license": "ISC",
@@ -48,9 +52,46 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.35",
+    "standard-version": "^9.5.0",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.1.2",
     "typescript": "^5.3.3",
     "vite": "^5.0.12"
+  },
+  "standard-version": {
+    "types": [
+      {
+        "type": "feat",
+        "section": "Features"
+      },
+      {
+        "type": "fix",
+        "section": "Bug Fixes"
+      },
+      {
+        "type": "chore",
+        "hidden": true
+      },
+      {
+        "type": "docs",
+        "section": "Documentation"
+      },
+      {
+        "type": "style",
+        "section": "Styling"
+      },
+      {
+        "type": "refactor",
+        "section": "Refactors"
+      },
+      {
+        "type": "perf",
+        "section": "Performance"
+      },
+      {
+        "type": "test",
+        "section": "Tests"
+      }
+    ]
   }
 }
