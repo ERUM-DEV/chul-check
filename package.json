@@ -1,7 +1,7 @@
 {
   "name": "electron-app",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Church Attendance Management System",
   "main": "electron/dbDDL.js",
   "scripts": {
